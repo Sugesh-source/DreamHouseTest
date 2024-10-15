@@ -63,10 +63,6 @@ jobs:
                   fi
             - name: Authenticate Dev Hub
               run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
-            - name: Authenticate to Scratch Org
-              run: >
-                  echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
-                  sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev
             - name: 'Delete dev scratch org'
               if: always()
               run: sf org delete scratch -p -o Dreamhouse-dev
