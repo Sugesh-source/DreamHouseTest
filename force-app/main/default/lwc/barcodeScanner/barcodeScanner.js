@@ -26,7 +26,7 @@ export default class BarcodeScanner extends NavigationMixin(LightningElement) {
             const scanningOptions = {
                 barcodeTypes: [this.myScanner.barcodeTypes.QR],
                 instructionText: 'Scan a QR Code',
-                successText: 'Scanning complete.'
+                successText: 'Scanning completed.'
             };
 
             // Try starting the scanning process, then using the result to navigate to a property record
