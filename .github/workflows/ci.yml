@@ -74,7 +74,7 @@ jobs:
             - name: Set the scratch org as default
               run: sf config set target-org=Dreamhouse-dev
             - name: Push source to scratch org
-              run: sf project deploy start -ignore-conflicts
+              run: sf project deploy start --ignore-conflicts
             - name: Assign permissionset to default user
               run:
                   sf org assign permset -n dreamhouse || echo "Permission Set already
