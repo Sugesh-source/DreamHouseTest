@@ -63,17 +63,38 @@ jobs:
                   fi
             - name: Authenticate Dev Hub
               run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
-            - name: Check if scratch org exists
+            # Install jq to process JSON (if needed for checking scratch org existence)
+            - name: Install jq
+              run: sudo apt-get install jq
+
+            # Try to authorize the scratch org (if it exists)
+            - name: Try to authenticate existing scratch org
               run: |
-                  sf org list | grep 'Dreamhouse-dev' || echo "Scratch org does not exist, skipping deletion."
-            - name: 'Delete dev scratch org'
-              if: always()
+                  if [ -n "${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }}" ]; then
+                    echo "Attempting to authenticate the existing scratch org..."
+                    echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
+                    sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev || echo "Failed to authenticate scratch org"
+                  else
+                    echo "No scratch org authentication secret provided, skipping authentication."
+                  fi
+
+            # Check if scratch org exists and delete if found
+            - name: Check if scratch org exists and delete if found
               run: |
-                  sf org delete scratch -p -o Dreamhouse-dev || echo "Scratch org not found, nothing to delete."
+                  ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-dev")) | length')
+                  if [ "$ORG_EXISTS" -gt 0 ]; then
+                    sf org delete scratch -p -o Dreamhouse-dev
+                    echo "Scratch org deleted."
+                  else
+                    echo "Scratch org not found, skipping deletion."
+                  fi
             - name: 'Create scratch org'
               run: sf org create scratch -f config/project-scratch-def.json -a Dreamhouse-dev -d -y 30
             - name: Set the scratch org as default
-              run: sf config set target-org=Dreamhouse-dev
+              run: |
+                  sf config set target-org=Dreamhouse-dev
+                  sf org display --target-org Dreamhouse-dev
+
             - name: Push source to scratch org
               run: sf project deploy start --ignore-conflicts
             - name: Assign permissionset to default user
