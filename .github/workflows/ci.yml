@@ -57,8 +57,8 @@ jobs:
               run: >
                   echo ${{ secrets.DEVHUB_SFDX_URL }} > ./DEVHUB_SFDX_URL.txt
                   secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
-                  if [ $secretFileSize == 1 ]; then
-                      echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
+                  if [ $secretFileSize -eq 1 ]; then
+                      echo "Missing DEVHUB_SFDX_URL secret";
                       exit 1;
                   fi
             - name: Authenticate Dev Hub
