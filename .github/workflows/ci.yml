@@ -14,7 +14,7 @@ on:
 # Jobs to be executed
 jobs:
     format-lint-lwc-tests:
-        runs-on: trailheadapps-Ubuntu
+        runs-on: ubuntu-latest
         steps:
             # Checkout the source code
             - name: 'Checkout source code'
@@ -60,7 +60,7 @@ jobs:
                   flags: LWC
 
     scratch-org-test:
-        runs-on: trailheadapps-Ubuntu
+        runs-on: ubuntu-latest
         needs: format-lint-lwc-tests
         if: github.actor != 'dependabot[bot]'
         steps:
@@ -91,21 +91,27 @@ jobs:
             - name: 'Authenticate Dev Hub'
               run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
 
-            # Create scratch org
-            - name: 'Create scratch org'
-              run: sf org create scratch -f config/project-scratch-def.json -a scratch-org -d -y 1
+            # Authenticate to the existing Scratch Org using the Auth URL from the secret
+            - name: 'Authenticate to Scratch Org'
+              run: |
+                  echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
+                  sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev
+
+            # Set the scratch org as default
+            - name: 'Set the scratch org as default'
+             run: sf config set target-org=Dreamhouse-dev
 
             # Deploy source to scratch org
             - name: 'Push source to scratch org'
-              run: sf project deploy start
+              run: sf project deploy start -ignore-conflicts
 
             # Assign permissionset
             - name: 'Assign permissionset to default user'
-              run: sf org assign permset -n dreamhouse
+              run: sf org assign permset -n dreamhouse || echo "Permission Set already assigned, continuing..."
 
             # Import sample data
             - name: 'Import sample data'
-              run: sf data tree import -p ./data/sample-data-plan.json
+              run: sf data tree import -p ./data/sample-data-plan.json || echo "Data already imported"
 
             # Run Apex tests in scratch org
             - name: 'Run Apex tests'
@@ -117,38 +123,3 @@ jobs:
               with:
                   token: ${{ secrets.CODECOV_TOKEN }}
                   flags: Apex
-
-            # Housekeeping
-            - name: 'Delete scratch org'
-              if: always()
-              run: sf org delete scratch -p -o scratch-org
-
-    trigger-packaging:
-        runs-on: trailheadapps-Ubuntu
-        needs: scratch-org-test
-        steps:
-            # Checkout the source code
-            - name: 'Checkout source code'
-              uses: actions/checkout@v4
-
-            # Check for package changes using git diff
-            - name: 'Check for package changes'
-              id: checkForChanges
-              run: |
-                  git fetch origin ${{ github.event.before }} --depth=1
-                  changedPaths=$( git diff-tree --name-only ${{ github.event.before }} $GITHUB_SHA )
-                  set +e
-                  hasChanges='false'
-                  if [ $(echo "$changedPaths" | grep -c '^force-app') == 1 ]; then
-                      hasChanges='true'
-                  fi
-                  echo "hasChanges=$hasChanges" >> $GITHUB_OUTPUT
-
-            # Trigger packaging workflow if needed
-            - name: 'Trigger packaging workflow if needed'
-              uses: peter-evans/repository-dispatch@v3
-              if: steps.checkForChanges.outputs.hasChanges == 'true'
-              with:
-                  token: ${{ secrets.BOT_ACCESS_TOKEN }}
-                  event-type: start-packaging
-                  client-payload: '{ "ref": "${{ github.ref }}", "sha": "${{ github.sha }}" }'
