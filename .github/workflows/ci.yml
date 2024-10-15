@@ -1,91 +1,92 @@
 ---
-  name: CI
-  on:
+name: CI
+on:
     workflow_dispatch: null
     push:
-      branches:
-        - main
-      paths-ignore:
-        - sfdx-project.json
-        - README.md
-  jobs:
+        branches:
+            - main
+        paths-ignore:
+            - sfdx-project.json
+            - README.md
+jobs:
     format-lint-lwc-tests:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout source code
-          uses: actions/checkout@v4
-        - name: Install Volta
-          uses: volta-cli/action@v4
-        - name: Restore node_modules cache
-          id: cache-npm
-          uses: actions/cache@v4
-          with:
-            path: node_modules
-            key: npm-${{ hashFiles('**/package-lock.json') }}
-            restore-keys: |
-              npm-${{ env.cache-name }}-
-              npm-
-        - name: Install npm dependencies
-          if: steps.cache-npm.outputs.cache-hit != 'true'
-          run: HUSKY=0 npm ci
-        - name: Code formatting verification with Prettier
-          run: npm run prettier:verify
-        - name: Lint Lightning Web Components / Aura Components
-          run: npm run lint
-        - name: Unit test Lightning Web Components
-          run: npm run test:unit:coverage
-        - name: Upload code coverage for LWC to Codecov.io
-          uses: codecov/codecov-action@v4
-          with:
-            token: ${{ secrets.CODECOV_TOKEN }}
-            flags: LWC
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout source code
+              uses: actions/checkout@v4
+            - name: Install Volta
+              uses: volta-cli/action@v4
+            - name: Restore node_modules cache
+              id: cache-npm
+              uses: actions/cache@v4
+              with:
+                  path: node_modules
+                  key: npm-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      npm-${{ env.cache-name }}-
+                      npm-
+            - name: Install npm dependencies
+              if: steps.cache-npm.outputs.cache-hit != 'true'
+              run: HUSKY=0 npm ci
+            - name: Code formatting verification with Prettier
+              run: npm run prettier:verify
+            - name: Lint Lightning Web Components / Aura Components
+              run: npm run lint
+            - name: Unit test Lightning Web Components
+              run: npm run test:unit:coverage
+            - name: Upload code coverage for LWC to Codecov.io
+              uses: codecov/codecov-action@v4
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  flags: LWC
     scratch-org-test:
-      runs-on: ubuntu-latest
-      needs: format-lint-lwc-tests
-      if: github.actor != 'dependabot[bot]'
-      steps:
-        - name: Install Salesforce CLI
-          run: |
-            npm install @salesforce/cli --location=global
-            nodeInstallPath=$(npm config get prefix)
-            echo "$nodeInstallPath/bin" >> $GITHUB_PATH
-            sf --version
-        - name: Checkout source code
-          uses: actions/checkout@v4
-        - name: Populate auth file with DEVHUB_SFDX_URL secret
-          shell: bash
-          run: >
-            echo ${{ secrets.DEVHUB_SFDX_URL }} > ./DEVHUB_SFDX_URL.txt
-  
-            secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
-  
-            if [ $secretFileSize == 1 ]; then
-                echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
-                exit 1;
-            fi
-        - name: Authenticate Dev Hub
-          run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
-        - name: Authenticate to Scratch Org
-          run: >
-            echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} >
-            ./SCRATCH_ORG_DEV_SFDX_URL.txt
-  
-            sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev
-        - name: Set the scratch org as default
-          run: sf config set target-org=Dreamhouse-dev
-        - name: Push source to scratch org
-          run: sf project deploy start -ignore-conflicts
-        - name: Assign permissionset to default user
-          run: sf org assign permset -n dreamhouse || echo "Permission Set already
-            assigned, continuing..."
-        - name: Import sample data
-          run: sf data tree import -p ./data/sample-data-plan.json || echo "Data already
-            imported"
-        - name: Run Apex tests
-          run: sf apex test run -c -r human -d ./tests/apex -w 20
-        - name: Upload code coverage for Apex to Codecov.io
-          uses: codecov/codecov-action@v4
-          with:
-            token: ${{ secrets.CODECOV_TOKEN }}
-            flags: Apex
-  
+        runs-on: ubuntu-latest
+        needs: format-lint-lwc-tests
+        if: github.actor != 'dependabot[bot]'
+        steps:
+            - name: Install Salesforce CLI
+              run: |
+                  npm install @salesforce/cli --location=global
+                  nodeInstallPath=$(npm config get prefix)
+                  echo "$nodeInstallPath/bin" >> $GITHUB_PATH
+                  sf --version
+            - name: Checkout source code
+              uses: actions/checkout@v4
+            - name: Populate auth file with DEVHUB_SFDX_URL secret
+              shell: bash
+              run: >
+                  echo ${{ secrets.DEVHUB_SFDX_URL }} > ./DEVHUB_SFDX_URL.txt
+
+                  secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
+
+                  if [ $secretFileSize == 1 ]; then
+                      echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
+                      exit 1;
+                  fi
+            - name: Authenticate Dev Hub
+              run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
+            - name: Authenticate to Scratch Org
+              run: >
+                  echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} >
+                  ./SCRATCH_ORG_DEV_SFDX_URL.txt
+
+                  sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev
+            - name: Set the scratch org as default
+              run: sf config set target-org=Dreamhouse-dev
+            - name: Push source to scratch org
+              run: sf project deploy start -ignore-conflicts
+            - name: Assign permissionset to default user
+              run:
+                  sf org assign permset -n dreamhouse || echo "Permission Set already
+                  assigned, continuing..."
+            - name: Import sample data
+              run:
+                  sf data tree import -p ./data/sample-data-plan.json || echo "Data already
+                  imported"
+            - name: Run Apex tests
+              run: sf apex test run -c -r human -d ./tests/apex -w 20
+            - name: Upload code coverage for Apex to Codecov.io
+              uses: codecov/codecov-action@v4
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  flags: Apex
