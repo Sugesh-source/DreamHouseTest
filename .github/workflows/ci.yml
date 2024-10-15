@@ -63,9 +63,13 @@ jobs:
                   fi
             - name: Authenticate Dev Hub
               run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
+            - name: Check if scratch org exists
+              run: |
+                  sf org list | grep 'Dreamhouse-dev' || echo "Scratch org does not exist, skipping deletion."
             - name: 'Delete dev scratch org'
               if: always()
-              run: sf org delete scratch -p -o Dreamhouse-dev
+              run: |
+                  sf org delete scratch -p -o Dreamhouse-dev || echo "Scratch org not found, nothing to delete."
             - name: 'Create scratch org'
               run: sf org create scratch -f config/project-scratch-def.json -a Dreamhouse-dev -d -y 30
             - name: Set the scratch org as default
