@@ -99,7 +99,7 @@ jobs:
                   sfdx force:org:display -u Dreamhouse-dev --verbose > auth_output.txt
                   cat auth_output.txt
             - name: Upload Auth URL
-              uses: actions/upload-artifact@v2
+              uses: actions/upload-artifact@v4
               with:
                   name: auth-url
                   path: auth_output.txt
