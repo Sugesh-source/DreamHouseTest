@@ -95,7 +95,14 @@ jobs:
                   sf config set target-org=Dreamhouse-dev
                   sf org display --target-org Dreamhouse-dev
             - name: 'Get the SFDX scratch org auth URL'
-              run: sfdx force:org:display -o Dreamhouse-dev --verbose
+              run: |
+                  sfdx force:org:display -u Dreamhouse-dev --verbose > auth_output.txt
+                  cat auth_output.txt
+            - name: Upload Auth URL
+              uses: actions/upload-artifact@v2
+              with:
+                  name: auth-url
+                  path: auth_output.txt
 
             - name: Push source to scratch org
               run: sf project deploy start --ignore-conflicts
