@@ -73,7 +73,7 @@ jobs:
                   if [ -n "${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }}" ]; then
                     echo "Attempting to authenticate the existing scratch org..."
                     echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
-                    sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev || echo "Failed to authenticate scratch org"
+                    sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-qa || echo "Failed to authenticate scratch org"
                   else
                     echo "No scratch org authentication secret provided, skipping authentication."
                   fi
@@ -81,9 +81,9 @@ jobs:
             # Check if scratch org exists and delete if found
             - name: Check if scratch org exists and delete if found
               run: |
-                  ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-dev")) | length')
+                  ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-qa")) | length')
                   if [ "$ORG_EXISTS" -gt 0 ]; then
-                    sf org delete scratch -p -o Dreamhouse-dev
+                    sf org delete scratch -p -o Dreamhouse-qa
                     echo "Scratch org deleted."
                   else
                     echo "Scratch org not found, skipping deletion."
@@ -94,6 +94,8 @@ jobs:
               run: |
                   sf config set target-org=Dreamhouse-dev
                   sf org display --target-org Dreamhouse-dev
+            - name: 'Get the SFDX scratch org auth URL'
+              run: sfdx force:org:display -o Dreamhouse-dev --verbose
 
             - name: Push source to scratch org
               run: sf project deploy start --ignore-conflicts
