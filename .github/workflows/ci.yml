@@ -5,6 +5,7 @@ on:
     push:
         branches:
             - main
+            - testSaleforce
         paths-ignore:
             - sfdx-project.json
             - README.md
@@ -94,16 +95,43 @@ jobs:
               run: |
                   sf config set target-org=Dreamhouse-dev
                   sf org display --target-org Dreamhouse-dev
+            # Step to retrieve and update the SFDX Auth URL for the scratch org
             - name: 'Get the SFDX scratch org auth URL'
               run: |
+                  # Extract the Sfdx Auth Url from the auth_output.txt file
                   sfdx force:org:display -u Dreamhouse-dev --verbose > auth_output.txt
-                  cat auth_output.txt
-            - name: Upload Auth URL
+                  SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output.txt | awk '{print $3}')
+                  echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
+
+            # Step to upload auth_output.txt as an artifact
+            - name: Upload Auth URL artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: auth-url
+                  name: auth-output
                   path: auth_output.txt
 
+            # Step to update the SCRATCH_ORG_DEV_SFDX_URL secret using BOT_ACCESS_TOKEN
+            - name: Update SCRATCH_ORG_DEV_SFDX_URL secret
+              env:
+                  SFDX_AUTH_URL: ${{ env.SFDX_AUTH_URL }}
+                  BOT_ACCESS_TOKEN: ${{ secrets.BOT_ACCESS_TOKEN }}
+              run: |
+                  echo "Updating SCRATCH_ORG_DEV_SFDX_URL secret..."
+
+                  # Fetch the repository public key to get the key_id (required for API request)
+                  KEY_ID=$(curl -s -H "Authorization: token $BOT_ACCESS_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/actions/secrets/public-key | jq -r .key_id)
+
+                  # Update the GitHub secret SCRATCH_ORG_DEV_SFDX_URL using the SFDX_AUTH_URL
+                  curl -X PUT \
+                  -H "Authorization: token $BOT_ACCESS_TOKEN" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  https://api.github.com/repos/${{ github.repository }}/actions/secrets/SCRATCH_ORG_DEV_SFDX_URL \
+                  -d @- << EOF
+                  {
+                    "encrypted_value": "$SFDX_AUTH_URL",
+                    "key_id": "$KEY_ID"
+                  }
+                  EOF
             - name: Push source to scratch org
               run: sf project deploy start --ignore-conflicts
             - name: Assign permissionset to default user
