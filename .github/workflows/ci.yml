@@ -103,13 +103,6 @@ jobs:
                   SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output.txt | awk '{print $3}')
                   echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
 
-            # Step to upload auth_output.txt as an artifact
-            - name: Upload Auth URL artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: auth-output
-                  path: auth_output.txt
-
             # Step to update the SCRATCH_ORG_DEV_SFDX_URL secret using BOT_ACCESS_TOKEN
             - name: Update SCRATCH_ORG_DEV_SFDX_URL secret
               env:
@@ -119,16 +112,21 @@ jobs:
                   echo "Updating SCRATCH_ORG_DEV_SFDX_URL secret..."
 
                   # Fetch the repository public key to get the key_id (required for API request)
-                  KEY_ID=$(curl -s -H "Authorization: token $BOT_ACCESS_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/actions/secrets/public-key | jq -r .key_id)
+                  PUBLIC_KEY_JSON=$(curl -s -H "Authorization: token $BOT_ACCESS_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/actions/secrets/public-key)
+                  KEY_ID=$(echo "$PUBLIC_KEY_JSON" | jq -r .key_id)
+                  PUBLIC_KEY=$(echo "$PUBLIC_KEY_JSON" | jq -r .key)
 
-                  # Update the GitHub secret SCRATCH_ORG_DEV_SFDX_URL using the SFDX_AUTH_URL
+                  # Encode the SFDX_AUTH_URL using the public key
+                  ENCRYPTED_SFDX_AUTH_URL=$(echo -n "$SFDX_AUTH_URL" | openssl rsautl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64)
+
+                  # Update the GitHub secret SCRATCH_ORG_DEV_SFDX_URL using the encoded SFDX_AUTH_URL
                   curl -X PUT \
                   -H "Authorization: token $BOT_ACCESS_TOKEN" \
                   -H "Accept: application/vnd.github.v3+json" \
                   https://api.github.com/repos/${{ github.repository }}/actions/secrets/SCRATCH_ORG_DEV_SFDX_URL \
                   -d @- << EOF
                   {
-                    "encrypted_value": "$SFDX_AUTH_URL",
+                    "encrypted_value": "$ENCRYPTED_SFDX_AUTH_URL",
                     "key_id": "$KEY_ID"
                   }
                   EOF
