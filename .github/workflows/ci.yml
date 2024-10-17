@@ -98,11 +98,9 @@ jobs:
             # Step to retrieve and update the SFDX Auth URL for the scratch org
             - name: 'Get the SFDX scratch org auth URL'
               run: |
-                  # Extract the Sfdx Auth Url from the auth_output.txt file
-                  sfdx force:org:display -u Dreamhouse-dev --verbose > auth_output.txt
+                  sfdx force:org:display --target-org Dreamhouse-dev --verbose > auth_output.txt
                   SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output.txt | awk '{print $3}')
                   echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
-                        - name: Upload Auth URL
             - name: Upload Auth URL
               uses: actions/upload-artifact@v4
               with:
