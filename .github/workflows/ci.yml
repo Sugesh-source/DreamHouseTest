@@ -119,23 +119,15 @@ jobs:
                   PUBLIC_KEY_JSON=$(curl -s -H "Authorization: token $BOT_ACCESS_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/Sugesh-source/DreamHouseTest/actions/secrets/public-key)
                   KEY_ID=$(echo "$PUBLIC_KEY_JSON" | jq -r .key_id)
                   PUBLIC_KEY=$(echo "$PUBLIC_KEY_JSON" | jq -r .key)
-
-                  # Decode the public key from base64 and write it to a PEM file
-                  echo "$PUBLIC_KEY" | base64 -d > public-key.pem
-
-                  # Check if the public key was decoded properly
-                  if [ ! -s public-key.pem ]; then
-                    echo "Failed to decode the public key"
-                    exit 1
-                  fi
-
-                  # Encrypt the SFDX_AUTH_URL using the public key with pkeyutl
-                  ENCRYPTED_SFDX_AUTH_URL=$(echo -n "$SFDX_AUTH_URL" | openssl pkeyutl -encrypt -pubin -inkey public-key.pem | base64)
-
+                  # Print the public key to check its value
+                  echo "Public Key: $PUBLIC_KEY"
+                  
+                  # Decode the public key from base64 and pipe it into OpenSSL directly, avoiding writing to a file
+                  ENCRYPTED_SFDX_AUTH_URL=$(echo -n "$SFDX_AUTH_URL" | openssl pkeyutl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64)
                   # Check if the encryption was successful
                   if [ -z "$ENCRYPTED_SFDX_AUTH_URL" ]; then
-                    echo "Failed to encrypt the SFDX_AUTH_URL"
-                    exit 1
+                      echo "Failed to encrypt the SFDX_AUTH_URL"
+                      exit 1
                   fi
 
                   # Update the GitHub secret SCRATCH_ORG_DEV_SFDX_URL using the encoded SFDX_AUTH_URL
@@ -149,7 +141,6 @@ jobs:
                     "key_id": "$KEY_ID"
                   }
                   EOF
-
             - name: Push source to scratch org
               run: sf project deploy start --ignore-conflicts
             - name: Assign permissionset to default user
