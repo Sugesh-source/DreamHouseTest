@@ -69,26 +69,26 @@ jobs:
               run: sudo apt-get install jq
 
             # Try to authorize the scratch org (if it exists)
-            - name: Try to authenticate existing scratch org
-              run: |
-                  if [ -n "${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }}" ]; then
-                    echo "Attempting to authenticate the existing scratch org..."
-                    echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
-                    sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev || echo "Failed to authenticate scratch org"
-                  else
-                    echo "No scratch org authentication secret provided, skipping authentication."
-                  fi
+            # - name: Try to authenticate existing scratch org
+            #   run: |
+            #       if [ -n "${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }}" ]; then
+            #         echo "Attempting to authenticate the existing scratch org..."
+            #         echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
+            #         sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev || echo "Failed to authenticate scratch org"
+            #       else
+            #         echo "No scratch org authentication secret provided, skipping authentication."
+            #       fi
 
-            # Check if scratch org exists and delete if found
-            - name: Check if scratch org exists and delete if found
-              run: |
-                  ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-dev")) | length')
-                  if [ "$ORG_EXISTS" -gt 0 ]; then
-                    sf org delete scratch -p -o Dreamhouse-dev
-                    echo "Scratch org deleted."
-                  else
-                    echo "Scratch org not found, skipping deletion."
-                  fi
+            # # Check if scratch org exists and delete if found
+            # - name: Check if scratch org exists and delete if found
+            #   run: |
+            #       ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-dev")) | length')
+            #       if [ "$ORG_EXISTS" -gt 0 ]; then
+            #         sf org delete scratch -p -o Dreamhouse-dev
+            #         echo "Scratch org deleted."
+            #       else
+            #         echo "Scratch org not found, skipping deletion."
+            #       fi
             - name: 'Create scratch org'
               run: sf org create scratch -f config/project-scratch-def.json -a Dreamhouse-dev -d -y 30
             - name: Set the scratch org as default
@@ -102,6 +102,12 @@ jobs:
                   sfdx force:org:display -u Dreamhouse-dev --verbose > auth_output.txt
                   SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output.txt | awk '{print $3}')
                   echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
+                        - name: Upload Auth URL
+            - name: Upload Auth URL
+              uses: actions/upload-artifact@v4
+              with:
+                  name: auth-url
+                  path: auth_output.txt
 
             # Step to update the SCRATCH_ORG_DEV_SFDX_URL secret using BOT_ACCESS_TOKEN
             - name: Update SCRATCH_ORG_DEV_SFDX_URL secret
@@ -112,18 +118,21 @@ jobs:
                   echo "Updating SCRATCH_ORG_DEV_SFDX_URL secret..."
 
                   # Fetch the repository public key to get the key_id (required for API request)
-                  PUBLIC_KEY_JSON=$(curl -s -H "Authorization: token $BOT_ACCESS_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/actions/secrets/public-key)
+                  PUBLIC_KEY_JSON=$(curl -s -H "Authorization: token $BOT_ACCESS_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/Sugesh-source/DreamHouseTest/actions/secrets/public-key)
                   KEY_ID=$(echo "$PUBLIC_KEY_JSON" | jq -r .key_id)
                   PUBLIC_KEY=$(echo "$PUBLIC_KEY_JSON" | jq -r .key)
 
-                  # Encode the SFDX_AUTH_URL using the public key
-                  ENCRYPTED_SFDX_AUTH_URL=$(echo -n "$SFDX_AUTH_URL" | openssl rsautl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64)
+                  # Decode the public key from base64
+                  echo "$PUBLIC_KEY" | base64 -d > public-key.pem
+
+                  # Encrypt the SFDX_AUTH_URL using the public key with pkeyutl
+                  ENCRYPTED_SFDX_AUTH_URL=$(echo -n "$SFDX_AUTH_URL" | openssl pkeyutl -encrypt -pubin -inkey public-key.pem | base64)
 
                   # Update the GitHub secret SCRATCH_ORG_DEV_SFDX_URL using the encoded SFDX_AUTH_URL
                   curl -X PUT \
                   -H "Authorization: token $BOT_ACCESS_TOKEN" \
                   -H "Accept: application/vnd.github.v3+json" \
-                  https://api.github.com/repos/${{ github.repository }}/actions/secrets/SCRATCH_ORG_DEV_SFDX_URL \
+                  https://api.github.com/repos/Sugesh-source/DreamHouseTest/actions/secrets/SCRATCH_ORG_DEV_SFDX_URL \
                   -d @- << EOF
                   {
                     "encrypted_value": "$ENCRYPTED_SFDX_AUTH_URL",
