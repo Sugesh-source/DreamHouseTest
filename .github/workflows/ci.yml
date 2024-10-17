@@ -121,7 +121,7 @@ jobs:
                   PUBLIC_KEY=$(echo "$PUBLIC_KEY_JSON" | jq -r .key)
                   # Print the public key to check its value
                   echo "Public Key: $PUBLIC_KEY"
-                  
+
                   # Decode the public key from base64 and pipe it into OpenSSL directly, avoiding writing to a file
                   ENCRYPTED_SFDX_AUTH_URL=$(echo -n "$SFDX_AUTH_URL" | openssl pkeyutl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64)
                   # Check if the encryption was successful
