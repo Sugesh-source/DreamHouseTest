@@ -69,26 +69,26 @@ jobs:
               run: sudo apt-get install jq
 
             # Try to authorize the scratch org (if it exists)
-            # - name: Try to authenticate existing scratch org
-            #   run: |
-            #       if [ -n "${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }}" ]; then
-            #         echo "Attempting to authenticate the existing scratch org..."
-            #         echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
-            #         sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev || echo "Failed to authenticate scratch org"
-            #       else
-            #         echo "No scratch org authentication secret provided, skipping authentication."
-            #       fi
+            - name: Try to authenticate existing scratch org
+              run: |
+                  if [ -n "${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }}" ]; then
+                    echo "Attempting to authenticate the existing scratch org..."
+                    echo ${{ secrets.SCRATCH_ORG_DEV_SFDX_URL }} > ./SCRATCH_ORG_DEV_SFDX_URL.txt
+                    sf org login sfdx-url -f ./SCRATCH_ORG_DEV_SFDX_URL.txt -a Dreamhouse-dev || echo "Failed to authenticate scratch org"
+                  else
+                    echo "No scratch org authentication secret provided, skipping authentication."
+                  fi
 
-            # # Check if scratch org exists and delete if found
-            # - name: Check if scratch org exists and delete if found
-            #   run: |
-            #       ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-dev")) | length')
-            #       if [ "$ORG_EXISTS" -gt 0 ]; then
-            #         sf org delete scratch -p -o Dreamhouse-dev
-            #         echo "Scratch org deleted."
-            #       else
-            #         echo "Scratch org not found, skipping deletion."
-            #       fi
+            # Check if scratch org exists and delete if found
+            - name: Check if scratch org exists and delete if found
+              run: |
+                  ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-dev")) | length')
+                  if [ "$ORG_EXISTS" -gt 0 ]; then
+                    sf org delete scratch -p -o Dreamhouse-dev
+                    echo "Scratch org deleted."
+                  else
+                    echo "Scratch org not found, skipping deletion."
+                  fi
             - name: 'Create scratch org'
               run: sf org create scratch -f config/project-scratch-def.json -a Dreamhouse-dev -d -y 30
             - name: Set the scratch org as default
