@@ -5,6 +5,7 @@ on:
     push:
         branches:
             - main
+            - testSaleforce
         paths-ignore:
             - sfdx-project.json
             - README.md
@@ -94,10 +95,12 @@ jobs:
               run: |
                   sf config set target-org=Dreamhouse-dev
                   sf org display --target-org Dreamhouse-dev
+            # Step to retrieve and update the SFDX Auth URL for the scratch org
             - name: 'Get the SFDX scratch org auth URL'
               run: |
-                  sfdx force:org:display -u Dreamhouse-dev --verbose > auth_output.txt
-                  cat auth_output.txt
+                  sfdx force:org:display --target-org Dreamhouse-dev --verbose > auth_output.txt
+                  SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output.txt | awk '{print $3}')
+                  echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
             - name: Upload Auth URL
               uses: actions/upload-artifact@v4
               with:

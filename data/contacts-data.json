@@ -35,8 +35,8 @@
                 "type": "Contact",
                 "referenceId": "Contact4Ref"
             },
-            "FirstName": "Anna",
-            "LastName": "Jones",
+            "FirstName": "Sam",
+            "LastName": "Johnson",
             "Phone": "617-555-0181",
             "Email": "annaj@mymail.com"
         },
@@ -45,8 +45,8 @@
                 "type": "Contact",
                 "referenceId": "Contact5Ref"
             },
-            "FirstName": "Rajesh",
-            "LastName": "Suresh",
+            "FirstName": "Sugantha",
+            "LastName": "Ramachandran",
             "Phone": "617-555-0134",
             "Email": "raj@goodmail.com"
         }
