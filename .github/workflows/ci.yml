@@ -116,21 +116,26 @@ jobs:
               run: |
                   sf data tree import -p ./data/sample-data-plan.json && echo "Data successfully imported" || echo "Data already imported or failed"
             - name: Run Apex tests
-              run: sf apex test run -c -r human -d ./tests/apex -w 20
+              id: run-apex-tests
+              run: sf apex test run -c -r json -d ./tests/apex -w 20 > apex-test-result.json
+
             - name: Calculate pass percentage
               id: check_pass_rate
               run: |
-                  numTestsRun=$(jq '.result.summary.numTestsRun' test-result.json)
-                  numTestFailures=$(jq '.result.summary.numTestFailures' test-result.json)
+                  numTestsRun=$(jq '.result.summary.numTestsRun' apex-test-result.json)
+                  numTestFailures=$(jq '.result.summary.numTestFailures' apex-test-result.json)
                   passPercentage=$(echo "scale=2; (100 * ($numTestsRun - $numTestFailures) / $numTestsRun)" | bc)
                   echo "Pass Percentage: $passPercentage%"
                   echo "::set-output name=passPercentage::$passPercentage"
+
+            # Task to upload code coverage for Apex
             - name: Upload code coverage for Apex to Codecov.io
               uses: codecov/codecov-action@v4
               with:
                   token: ${{ secrets.CODECOV_TOKEN }}
                   flags: Apex
-            # Upload test results and coverage as an artifact
+
+            # Task to upload test coverage and results as an artifact
             - name: Upload test coverage and results for Dev
               uses: actions/upload-artifact@v4
               with:
