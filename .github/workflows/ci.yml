@@ -124,10 +124,16 @@ jobs:
               run: |
                   numTestsRun=$(jq '.result.summary.numTestsRun' apex-test-result.json)
                   numTestFailures=$(jq '.result.summary.numTestFailures' apex-test-result.json)
-                  passPercentage=$(echo "scale=2; (100 * ($numTestsRun - $numTestFailures) / $numTestsRun)" | bc)
-                  echo "Pass Percentage: $passPercentage%"
-                  echo "::set-output name=passPercentage::$passPercentage"
 
+                  if [ "$numTestsRun" -eq 0 ]; then
+                    passPercentage=0
+                  else
+                    passPercentage=$(echo "scale=2; (100 * ($numTestsRun - $numTestFailures) / $numTestsRun)" | bc)
+                  fi
+
+                  echo "Pass Percentage: $passPercentage%"
+                  echo "passPercentage=$passPercentage" >> $GITHUB_ENV
+                  echo "::set-output name=passPercentage::$passPercentage"
             # Task to upload code coverage for Apex
             - name: Upload code coverage for Apex to Codecov.io
               uses: codecov/codecov-action@v4
