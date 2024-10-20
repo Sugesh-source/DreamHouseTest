@@ -98,14 +98,14 @@ jobs:
             # Step to retrieve and update the SFDX Auth URL for the scratch org
             - name: 'Get the SFDX scratch org auth URL'
               run: |
-                  sfdx force:org:display --target-org Dreamhouse-dev --verbose > auth_output.txt
-                  SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output.txt | awk '{print $3}')
+                  sfdx force:org:display --target-org Dreamhouse-dev --verbose > auth_output_dev.txt
+                  SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output_dev.txt | awk '{print $3}')
                   echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
             - name: Upload Auth URL
               uses: actions/upload-artifact@v4
               with:
-                  name: auth-url
-                  path: auth_output.txt
+                  name: auth-dev-url
+                  path: auth_output_dev.txt
 
             - name: Push source to scratch org
               run: sf project deploy start --ignore-conflicts
@@ -117,8 +117,96 @@ jobs:
                   sf data tree import -p ./data/sample-data-plan.json && echo "Data successfully imported" || echo "Data already imported or failed"
             - name: Run Apex tests
               run: sf apex test run -c -r human -d ./tests/apex -w 20
+            - name: Calculate pass percentage
+              id: check_pass_rate
+              run: |
+                  numTestsRun=$(jq '.result.summary.numTestsRun' test-result.json)
+                  numTestFailures=$(jq '.result.summary.numTestFailures' test-result.json)
+                  passPercentage=$(echo "scale=2; (100 * ($numTestsRun - $numTestFailures) / $numTestsRun)" | bc)
+                  echo "Pass Percentage: $passPercentage%"
+                  echo "::set-output name=passPercentage::$passPercentage"
             - name: Upload code coverage for Apex to Codecov.io
               uses: codecov/codecov-action@v4
               with:
                   token: ${{ secrets.CODECOV_TOKEN }}
                   flags: Apex
+            # Upload test results and coverage as an artifact
+            - name: Upload test coverage and results for Dev
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dev-test-results
+                  path: ./tests/apex
+    deploy-to-qa:
+        runs-on: ubuntu-latest
+        needs: scratch-org-dev
+        if: needs.scratch-org-dev.outputs.passPercentage >= 90
+        steps:
+            - name: Install Salesforce CLI
+              run: |
+                  npm install @salesforce/cli --location=global
+                  nodeInstallPath=$(npm config get prefix)
+                  echo "$nodeInstallPath/bin" >> $GITHUB_PATH
+                  sf --version
+
+            - name: Checkout source code
+              uses: actions/checkout@v4
+            - name: Authenticate Dev Hub
+              run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
+            # Install jq to process JSON (if needed for checking scratch org existence)
+            - name: Install jq
+              run: sudo apt-get install jq
+
+            # Try to authorize the scratch org (if it exists)
+            - name: Try to authenticate existing QA scratch org
+              run: |
+                  if [ -n "${{ secrets.SCRATCH_ORG_QA_SFDX_URL }}" ]; then
+                    echo "Attempting to authenticate the existing scratch org..."
+                    echo ${{ secrets.SCRATCH_ORG_QA_SFDX_URL }} > ./SCRATCH_ORG_QA_SFDX_URL.txt
+                    sf org login sfdx-url -f ./SCRATCH_ORG_QA_SFDX_URL.txt -a Dreamhouse-qa || echo "Failed to authenticate scratch org"
+                  else
+                    echo "No scratch org authentication secret provided, skipping authentication."
+                  fi
+
+            # Check if scratch org exists and delete if found
+            - name: Check if scratch org exists and delete if found
+              run: |
+                  ORG_EXISTS=$(sf org list --json | jq '.result.scratchOrgs | map(select(.alias == "Dreamhouse-qa")) | length')
+                  if [ "$ORG_EXISTS" -gt 0 ]; then
+                    sf org delete scratch -p -o Dreamhouse-qa
+                    echo "Scratch org deleted."
+                  else
+                    echo "Scratch org not found, skipping deletion."
+                  fi
+            - name: 'Create scratch org'
+              run: sf org create scratch -f config/project-scratch-def.json -a Dreamhouse-qa -d -y 30
+            - name: Set the scratch org as default
+              run: |
+                  sf config set target-org=Dreamhouse-qa
+                  sf org display --target-org Dreamhouse-qa
+            # Step to retrieve and update the SFDX Auth URL for the scratch org
+            - name: 'Get the SFDX scratch org auth URL'
+              run: |
+                  sfdx force:org:display --target-org Dreamhouse-qa --verbose > auth_output_qa.txt
+                  SFDX_AUTH_URL=$(grep 'Sfdx Auth Url' auth_output_qa.txt | awk '{print $3}')
+                  echo "SFDX_AUTH_URL=$SFDX_AUTH_URL" >> $GITHUB_ENV
+            - name: Upload Auth URL
+              uses: actions/upload-artifact@v4
+              with:
+                  name: auth-qa-url
+                  path: auth_output_qa.txt
+
+            # Deploy source to QA
+            - name: Deploy to QA
+              run: sf project deploy start --target-org=Dreamhouse-qa --ignore-conflicts
+
+            # Run Apex tests in QA
+            - name: Run Apex tests in QA
+              id: run-apex-tests-qa
+              run: sf apex test run --target-org=Dreamhouse-qa --codecoverage --json > qa-test-result.json
+
+            # Upload QA test results and coverage as an artifact
+            - name: Upload test coverage and results for QA
+              uses: actions/upload-artifact@v4
+              with:
+                  name: qa-test-results
+                  path: ./qa-test-result.json
