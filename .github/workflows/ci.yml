@@ -122,8 +122,11 @@ jobs:
             - name: Calculate pass percentage
               id: check_pass_rate
               run: |
-                  numTestsRun=$(jq '.result.summary.numTestsRun' apex-test-result.json)
-                  numTestFailures=$(jq '.result.summary.numTestFailures' apex-test-result.json)
+                  numTestsRun=$(jq -r '.result.summary.testsRan // 0' apex-test-result.json)
+                  numTestFailures=$(jq -r '.result.summary.failing // 0' apex-test-result.json)
+
+                  echo "Number of tests run: $numTestsRun"
+                  echo "Number of test failures: $numTestFailures"
 
                   if [ "$numTestsRun" -eq 0 ]; then
                     passPercentage=0
@@ -132,9 +135,11 @@ jobs:
                   fi
 
                   echo "Pass Percentage: $passPercentage%"
+
+                  # Save the pass percentage to the GitHub environment file
                   echo "passPercentage=$passPercentage" >> $GITHUB_ENV
-                  echo "::set-output name=passPercentage::$passPercentage"
-            # Task to upload code coverage for Apex
+
+                    # Task to upload code coverage for Apex
             - name: Upload code coverage for Apex to Codecov.io
               uses: codecov/codecov-action@v4
               with:
