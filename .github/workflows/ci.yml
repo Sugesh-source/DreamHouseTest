@@ -137,9 +137,7 @@ jobs:
                   echo "Pass Percentage: $passPercentage%"
 
                   # Save the pass percentage to the GitHub environment file
-                  echo "passPercentage=$passPercentage" >> $GITHUB_ENV
-
-                    # Task to upload code coverage for Apex
+                  echo "passPercentage=$passPercentage" >> $GITHUB_OUTPUT
             - name: Upload code coverage for Apex to Codecov.io
               uses: codecov/codecov-action@v4
               with:
